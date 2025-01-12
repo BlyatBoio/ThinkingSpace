@@ -5,14 +5,14 @@ A simple canvas-like editor Imade over christmas break
 
 # Method 1
 1.Install VS Code if you dont have it already
-2. In VS Code, install th p5.vs code and p5js live server extensions in addition to javascript language support
+
+2. In VS Code, install the p5.vs code and p5js live server extensions in addition to javascript language support
 
 3. add the file titled Thinking Space to your chosed VS Code Projects folder
-4. 
+   
    this file should include the index.html, jsconfig.josn, etc.
    
 6. Open the sketch.js file, and hit the button in the bottom right that says "Go Live"
-
    this will open up a local hosted web page on your default browser where The code will run
 
 # Method 2
