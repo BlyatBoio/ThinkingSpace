@@ -123,6 +123,12 @@ function draw()
 
   // drawing UI
 
+  // draw all drawn items
+  for (let i = 0; i < drawnItems.length; i++)
+    {
+      drawnItems[i].drawSelf();
+    }
+
   if (doMouseDraw == true)
   {
     mouseCanMoveCam = false;
@@ -164,12 +170,6 @@ function draw()
       ypos.push(mouseY);
     }
     pop();
-  }
-
-  // draw all drawn items
-  for (let i = 0; i < drawnItems.length; i++)
-  {
-    drawnItems[i].drawSelf();
   }
 
   // drawing
