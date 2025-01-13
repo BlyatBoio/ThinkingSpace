@@ -52,6 +52,9 @@ let basicWindow;
 let buttonPressed = false;
 let frame1 = true;
 
+let clipboard = undefined;
+
+let actions = [];
 
 function setup()
 {
@@ -93,7 +96,7 @@ function setup()
   brushSize = createSlider(1, 100, 5, 5);
   brushSize.position(80, height - 28);
 
-  brushFillColor = createInput('rgba(255, 0, 0, 255)', 'color');
+  brushFillColor = createInput('#FFFFFF', 'color');
   brushFillColor.position(220, height - 42);
 
   saveFileInput = createFileInput(loadSaveFile);
@@ -193,14 +196,14 @@ function draw()
     buttonPressed = true;
   }
 
-    push();
-    textAlign(CENTER);
-    fill(255);
-    textSize(20);
-    stroke(0);
-    strokeWeight(1);
-    text(drawmingModeNames[drawingMode], 385, height - 28)
-    pop();
+  push();
+  textAlign(CENTER);
+  fill(255);
+  textSize(20);
+  stroke(0);
+  strokeWeight(1);
+  text(drawmingModeNames[drawingMode], 385, height - 28)
+  pop();
 
   // draw open windows
   for (let i = 0; i < drawnWindows.length; i++)
@@ -277,7 +280,6 @@ function loadSaveFile(file1)
     cameraY = file1.data.cameraY;
     console.log("Loaded File: " + file1.data.Name);
   }
-  console.log(drawnWindows)
 }
 
 function cameraControls()
@@ -321,16 +323,15 @@ function mousePressed()
   }
 }
 
+// primarily used for drawing functionality
 function mouseReleased()
 {
   if (doMouseDraw == true && doPushDrawing == true && collc(mouseX, mouseY, 5, 5, 0, height - 50, 500, height) == false)
   {
+    // xpos and ypos values are pushed together so they are both the ame length every time
     for (let i = 0; i < xpos.length; i++)
     {
       xpos[i] = round((((tDist(xpos[i], width / 2) / cameraScale) - cameraX)) + width / 2);
-    }
-    for (let i = 0; i < ypos.length; i++)
-    {
       ypos[i] = round((((tDist(ypos[i], height / 2) / cameraScale) - cameraY)) + height / 2);
     }
 
@@ -349,7 +350,7 @@ function mouseReleased()
 
 function tDist(x, x2)
 {
-  //if(x + x2 == undefined) console.log("ERROR: X and or X2 left undefined in tDist")
+  if(x + x2 == undefined) console.log("ERROR: X and or X2 left undefined in tDist")
   if (x < x2) return -dist(x, 0, x2, 0);
   else return dist(x, 0, x2, 0);
 }
@@ -409,20 +410,85 @@ function dataToClass(data, type)
     let c2 = dataToClass(data.collapseButon, "UIInput");
     let bt = dataToClass(data.bodyText, "UIInput");
     a.replaceInputs(ti, c1, c2, bt);
-    if(data.titleInp.isHidden == true) a.titleInp.hideSelf();
-    if(data.closeButton.isHidden == true) a.closeButton.hideSelf();
-    if(data.collapseButon.isHidden == true) a.collapseButon.hideSelf();
-    if(data.bodyText.isHidden == true) a.bodyText.hideSelf();
+    if (data.titleInp.isHidden == true) a.titleInp.hideSelf();
+    if (data.closeButton.isHidden == true) a.closeButton.hideSelf();
+    if (data.collapseButon.isHidden == true) a.collapseButon.hideSelf();
+    if (data.bodyText.isHidden == true) a.bodyText.hideSelf();
     return a;
   }
   if (type == "UIInput") return new UIInput(data.inpType, data.inWorldX, data.inWorldY, data.w, data.h, data.baseFontSize, undefined, data.id, data.value);
   if (type == "drawnItem") return new drawnItem(data.type, data.xs, data.ys, data.fillColor, data.strokeWeight, data.id);
 }
 
+function copyObject(obj)
+{
+  clipboard = obj;
+  console.log("Copied Object Type: " + clipboard.objectType + " With ID: " + clipboard.id);
+}
+
+function pasteObject()
+{
+  if(clipboard != undefined){
+    let pastedID = 0;
+    switch (clipboard.objectType)
+    {
+      case "Window":
+        let temp2 = new templateWindow(clipboard.w, clipboard.h, clipboard.fillColor, clipboard.borderColor, clipboard.borderSize);
+        let temp1 = new UIwindow(inWorldMouseX, inWorldMouseY, temp2)
+        temp1.isCollapsed = clipboard.isCollapsed;
+        let ti = dataToClass(clipboard.titleInp, "UIInput");
+        let c1 = dataToClass(clipboard.closeButton, "UIInput");
+        let c2 = dataToClass(clipboard.collapseButon, "UIInput");
+        let bt = dataToClass(clipboard.bodyText, "UIInput");
+        temp1.replaceInputs(ti, c1, c2, bt);
+        if (clipboard.titleInp.isHidden == true) temp1.titleInp.hideSelf();
+        if (clipboard.closeButton.isHidden == true) temp1.closeButton.hideSelf();
+        if (clipboard.collapseButon.isHidden == true) temp1.collapseButon.hideSelf();
+        if (clipboard.bodyText.isHidden == true) temp1.bodyText.hideSelf();
+
+        let dx = tDist(inWorldMouseX, clipboard.inWorldX);
+        let dy = tDist(inWorldMouseY, clipboard.inWorldY);
+
+        for (let i = 0; i < temp1.UIInputs.length; i++)
+        {
+          temp1.UIInputs[i].inWorldX += dx;
+          temp1.UIInputs[i].inWorldY += dy;
+        }
+
+        drawnWindows.push(temp1);
+        pastedID = drawnWindows.length;
+        break;
+      case "Drawn Item":
+        let newXs = [];
+        let newYs = [];
+        for(let i = 0; i < clipboard.xs.length; i++){
+          newXs.push(clipboard.xs[i])
+          newYs.push(clipboard.ys[i])
+        }
+        let d1 = new drawnItem(clipboard.type, newXs, newYs, clipboard.fillColor, clipboard.strokeWeight);
+        let xDist = tDist(inWorldMouseX, clipboard.xs[0]);
+        let yDist = tDist(inWorldMouseY, clipboard.ys[0]);
+        for (let i = 0; i < d1.xs.length; i++)
+        {
+          d1.xs[i] += xDist;
+          d1.ys[i] += yDist;
+          if(d1.type == "Circle") break;
+          }
+        drawnItems.push(d1);
+        pastedID = d1.id;
+        break;
+    }
+    console.log("Pasted Object Type: " + clipboard.objectType + " at X: " + inWorldMouseX + " Y: " + inWorldMouseY + " With ID: " + pastedID);
+  }
+}
+
 class UIwindow
 {
   constructor(inWorldX, inWorldY, templateWindow1)
   {
+    // used for which vars to pass through in copy/paste\
+    this.objectType = "Window";
+
     // drawing x and y positions
     this.inWorldX = inWorldX;
     this.inWorldY = inWorldY;
@@ -443,7 +509,7 @@ class UIwindow
 
     this.UIInputs = [];
 
-    let textOff = 20;
+    let textOff = 30;
     // title input
     let a = createElement('TextArea');
     a.style('background-color: rgba(0, 0, 0, 0)');
@@ -484,6 +550,14 @@ class UIwindow
     this.saveInpx = 0;
     this.saveInpy = 0;
     this.saveInph = 0;
+
+    // vars for undoing actions
+    this.totalMovedX = 0;
+    this.totalMovedY = 0;
+    this.totalScaledX = 0;
+    this.totalScaledY = 0;
+
+    new action("Create", this);
   }
   drawSelf()
   {
@@ -513,6 +587,26 @@ class UIwindow
     if (this.collapseButon.isPressed() == true) this.collapse();
     else this.isC = false;
     pop();
+
+    // push actions into action array for undo functionality
+    if(mouseIsPressed == false){
+      if(abs(this.totalMovedX + this.totalMovedY )> 0){
+        let a = [];
+        for(let i = 0; i < this.UIInputs.length; i++){
+          a.push(this.UIInputs[i]);
+        }
+        a.push(this);
+        new action("groupPosition", a, this.totalMovedX, this.totalMovedY);
+        this.totalMovedX = 0;
+        this.totalMovedY = 0;
+      }
+      
+      if(abs(this.totalScaledX + this.totalScaledY) > 0){
+        new action("adjustScale", this, this.totalScaledX, this.totalScaledY);
+        this.totalScaledX = 0;
+        this.totalScaledY = 0;
+      }
+    }
   }
   hoveringChildInput()
   {
@@ -534,16 +628,18 @@ class UIwindow
     fill(255);
     let xMoved = 0;
     let yMoved = 0;
+    let scaledX = 0;
+    let scaledY = 0;
 
     // determine what side of the UI Window the mouse is on
 
     let xSide = 0;
-    if (mouseX < p1.x + 20) xSide = 1; // left side
-    if (mouseX > p1.x + this.w * cameraScale - 20) xSide = -1; // right side
+    if (mouseX - movedMouseX / cameraScale < p1.x + 20) xSide = 1; // left side
+    if (mouseX - movedMouseX / cameraScale > p1.x + this.w * cameraScale - 20) xSide = -1; // right side
 
     let ySide = 0;
-    if (mouseY < p1.y + 20) ySide = 1; // Top side
-    if (mouseY > p1.y + this.h * cameraScale - 20) ySide = -1; // Bottom side
+    if (mouseY - movedMouseY / cameraScale < p1.y + 20) ySide = 1; // Top side
+    if (mouseY - movedMouseY / cameraScale > p1.y + this.h * cameraScale - 20) ySide = -1; // Bottom side
 
     if (this.isCollapsed == false)
     {
@@ -554,9 +650,10 @@ class UIwindow
         // x movement applies for all
         if (mouseIsPressed)
         {
-          this.inWorldX += movedMouseX;
-          this.w -= movedMouseX;
-          xMoved += movedMouseX;
+          this.inWorldX += movedMouseX / cameraScale;
+          this.w -= movedMouseX / cameraScale;
+          xMoved += movedMouseX / cameraScale;
+          scaledX -= movedMouseX / cameraScale;
         }
         // top side
         if (ySide == 1)
@@ -576,7 +673,10 @@ class UIwindow
       {
 
         // x movement applies for all
-        if (mouseIsPressed) this.w += movedMouseX;
+        if (mouseIsPressed) {
+          this.w += movedMouseX / cameraScale;
+          scaledX += movedMouseX / cameraScale;
+        }
 
         // top side
         if (ySide == 1)
@@ -597,25 +697,29 @@ class UIwindow
         if (xSide == 0) line(p1.x, p1.y, p1.x + this.w * cameraScale, p1.y);
         if (mouseIsPressed)
         {
-          this.inWorldY += movedMouseY;
-          this.h -= movedMouseY;
-          yMoved += movedMouseY;
+          this.inWorldY += movedMouseY / cameraScale;
+          this.h -= movedMouseY / cameraScale;
+          yMoved += movedMouseY / cameraScale;
+          scaledY -= movedMouseY/cameraScale;
         }
       }
 
       if (ySide == -1)
       {
         if (xSide == 0) line(p1.x, p1.y + this.h * cameraScale, p1.x + this.w * cameraScale, p1.y + this.h * cameraScale);
-        if (mouseIsPressed) this.h += movedMouseY;
+        if (mouseIsPressed) {
+          this.h += movedMouseY / cameraScale;
+          scaledY += movedMouseY / cameraScale;
+        }
       }
     }
     if (xSide == 0 && ySide == 0 && mouseIsPressed)
     {
-      this.inWorldX += movedMouseX;
-      this.inWorldY += movedMouseY;
+      this.inWorldX += movedMouseX / cameraScale;
+      this.inWorldY += movedMouseY / cameraScale;
 
-      xMoved += movedMouseX;
-      yMoved += movedMouseY;
+      xMoved += movedMouseX / cameraScale;
+      yMoved += movedMouseY / cameraScale;
     }
 
     if (mouseIsPressed && (movedMouseX != 0 || movedMouseY != 0))
@@ -623,6 +727,10 @@ class UIwindow
       this.updateUIPosition(xMoved, yMoved);
       this.closeButton.inWorldX -= savew - this.w;
     }
+    this.totalMovedX += xMoved;
+    this.totalMovedY += yMoved;
+    this.totalScaledX += scaledX;
+    this.totalScaledY += scaledY;
   }
   updateUIPosition(offX, offY)
   {
@@ -638,17 +746,18 @@ class UIwindow
     let p1 = adjustForCamera(this.inWorldX, this.inWorldY);
 
     // retur true if collision check is true
-    if (collc(mouseX, mouseY, 5, 5, p1.x, p1.y, this.w * cameraScale, this.h * cameraScale, 20, 40) == true || this.hoveringChildInput() == true) return true;
+    if (collc(mouseX - movedMouseX, mouseY - movedMouseY, 5, 5, p1.x, p1.y, this.w * cameraScale, this.h * cameraScale, 20, 40) == true || this.hoveringChildInput() == true) return true;
     return false;
   }
-  close()
+  close(pushNewAction)
   {
+    if(pushNewAction != false) new action("Delete", this, this.UIInputs);
     for (let i = 0; i < this.UIInputs.length; i++)
     {
       this.UIInputs[i].deleteSelf(true, this.id);
     }
     drawnWindows = del(drawnWindows, this.id);
-    console.log("Closed Window ID: " + (this.id + 1))
+    console.log("Closed Window With ID: " + (this.id + 1));
   }
   collapse()
   {
@@ -707,8 +816,9 @@ class UIwindow
   }
   replaceInputs(titleInp, closeButton, collapseButon, bodyText)
   {
-    for(let i = 0; i < this.UIInputs.length; i++){
-      if(this.UIInputs[i].input != undefined) this.UIInputs[i].input.remove();
+    for (let i = 0; i < this.UIInputs.length; i++)
+    {
+      if (this.UIInputs[i].input != undefined) this.UIInputs[i].input.remove();
     }
     this.titleInp = titleInp;
     this.closeButton = closeButton;
@@ -756,6 +866,7 @@ class UIInput
 {
   constructor(inpType, inWorldX, inWorldY, w, h, baseFontSize, input1, id, value)
   {
+    this.objectType = "Input";
     this.inpType = inpType;
     this.inWorldX = inWorldX;
     this.inWorldY = inWorldY;
@@ -770,6 +881,11 @@ class UIInput
     this.isOffscreen = false;
     if (input1 != undefined) this.value = input1.value();
     if (value != undefined) this.value = value;
+
+    this.totalMovedX = 0;
+    this.totalMovedY = 0;
+    this.totalScaledX = 0;
+    this.totalScaledY = 0;
   }
   drawSelf()
   {
@@ -802,11 +918,13 @@ class UIInput
       }
 
       // completely off screen
-      if (p1.x > width || p1.x + this.w * cameraScale < 0 || p1.y > height || p1.y + this.h * cameraScale < 0) {
+      if (p1.x > width || p1.x + this.w * cameraScale < 0 || p1.y > height || p1.y + this.h * cameraScale < 0)
+      {
         this.input.hide();
         this.isOffscreen = true;
       }
-      else {
+      else
+      {
         this.input.show();
         this.isOffscreen = false;
       }
@@ -830,6 +948,20 @@ class UIInput
         if (mouseIsPressed && (keyIsDown(8) || keyIsDown(46))) this.deleteSelf();
       }
       if (this.input.value != undefined) this.value = this.input.value();
+
+      if(mouseIsPressed == false){
+        if(abs(this.totalMovedX + this.totalMovedY) > 0){
+          new action("adjustPosition", this, this.totalMovedX, this.totalMovedY);
+          this.totalMovedX = 0;
+          this.totalMovedY = 0;
+        }
+        
+        if(abs(this.totalScaledX + this.totalScaledY) > 0){
+          new action("adjustScale", this, this.totalScaledX, this.totalScaledY);
+          this.totalScaledX = 0;
+          this.totalScaledY = 0;
+        }
+      }
     }
     if ((p1.x > width || p1.x + this.w * cameraScale < 0 || p1.y > height || p1.y + this.h * cameraScale < 0) == false) this.isOffscreen = false;
   }
@@ -843,15 +975,20 @@ class UIInput
     stroke(255);
     fill(255);
 
+    let xMoved = 0;
+    let yMoved = 0;
+    let scaledX = 0;
+    let scaledY = 0;
+
     // determine what side of the UI Window the mouse is on
 
     let xSide = 0;
-    if (mouseX < p1.x + 20) xSide = 1; // left side
-    if (mouseX > p1.x + this.w * cameraScale - 20) xSide = -1; // right side
+    if (mouseX - movedMouseX / cameraScale < p1.x + 20) xSide = 1; // left side
+    if (mouseX - movedMouseX / cameraScale > p1.x + this.w * cameraScale - 20) xSide = -1; // right side
 
     let ySide = 0;
-    if (mouseY < p1.y + 20) ySide = 1; // Top side
-    if (mouseY > p1.y + this.h * cameraScale - 20) ySide = -1; // Bottom side
+    if (mouseY - movedMouseY / cameraScale < p1.y + 20) ySide = 1; // Top side
+    if (mouseY - movedMouseY / cameraScale > p1.y + this.h * cameraScale - 20) ySide = -1; // Bottom side
 
     // left side checks 
     if (xSide == 1)
@@ -860,8 +997,10 @@ class UIInput
       // x movement applies for all
       if (mouseIsPressed)
       {
-        this.inWorldX += movedMouseX;
-        this.w -= movedMouseX;
+        this.inWorldX += movedMouseX / cameraScale;
+        this.w -= movedMouseX / cameraScale;
+        xMoved += movedMouseX / cameraScale;
+        scaledX -= movedMouseX / cameraScale;
       }
       // top side
       if (ySide == 1)
@@ -879,12 +1018,14 @@ class UIInput
     // right side checks
     if (xSide == -1)
     {
-      if (mouseIsPressed) this.w += movedMouseX;
 
       // x movement applies for all
-      if (mouseIsPressed)
-      {
+
+      if (mouseIsPressed) {
+        this.w += movedMouseX / cameraScale;
+        scaledX += movedMouseX / cameraScale;
       }
+
       // top side
       if (ySide == 1)
       {
@@ -904,21 +1045,34 @@ class UIInput
       if (xSide == 0) line(p1.x, p1.y, p1.x + this.w * cameraScale, p1.y);
       if (mouseIsPressed)
       {
-        this.inWorldY += movedMouseY;
-        this.h -= movedMouseY;
+        this.inWorldY += movedMouseY / cameraScale;
+        this.h -= movedMouseY / cameraScale;
+        yMoved += movedMouseY / cameraScale;
+        scaledY -= movedMouseY / cameraScale;
       }
     }
 
     if (ySide == -1)
     {
       if (xSide == 0) line(p1.x, p1.y + this.h * cameraScale, p1.x + this.w * cameraScale, p1.y + this.h * cameraScale);
-      if (mouseIsPressed) this.h += movedMouseY;
+      if (mouseIsPressed) {
+        this.h += movedMouseY / cameraScale;
+        scaledY += movedMouseY / cameraScale;
+      }
     }
     if (xSide == 0 && ySide == 0 && mouseIsPressed)
     {
-      this.inWorldX += movedMouseX;
-      this.inWorldY += movedMouseY;
+      this.inWorldX += movedMouseX / cameraScale;
+      this.inWorldY += movedMouseY / cameraScale;
+
+      xMoved += movedMouseX / cameraScale
+      yMoved += movedMouseY / cameraScale
     }
+
+    this.totalMovedX += xMoved;
+    this.totalMovedY += yMoved;
+    this.totalScaledX += scaledX;
+    this.totalScaledY += scaledY;
   }
   isPressed()
   {
@@ -928,7 +1082,6 @@ class UIInput
   deleteSelf(fromParent, parentID)
   {
     this.input.remove();
-    if (fromParent == undefined) drawnWindows[parentID].UIInputs = del(drawnWindows[parentID].UIInputs, this.id);
   }
   mouseIsOn()
   {
@@ -936,7 +1089,7 @@ class UIInput
     let p1 = adjustForCamera(this.inWorldX, this.inWorldY);
 
     // retur true if collision check is true
-    if (collc(mouseX, mouseY, 5, 5, p1.x, p1.y, this.w * cameraScale, this.h * cameraScale, 20, 20) == true) return true;
+    if (collc(mouseX - movedMouseX / cameraScale, mouseY - movedMouseY / cameraScale, 5, 5, p1.x, p1.y, this.w * cameraScale, this.h * cameraScale, 20, 20) == true) return true;
     return false;
   }
   hideSelf()
@@ -976,6 +1129,7 @@ class drawnItem
 {
   constructor(type, xs, ys, fillColor, strokeWeight, id)
   {
+    this.objectType = "Drawn Item";
     this.type = type;
     this.xs = xs;
     this.ys = ys;
@@ -986,6 +1140,7 @@ class drawnItem
     if (fillColor != undefined) this.fillColor = fillColor;
     if (strokeWeight != undefined) this.strokeWeight = strokeWeight;
     if (id != undefined) this.id = id;
+    new action("Create", this);
   }
   drawSelf()
   {
@@ -1026,68 +1181,210 @@ class drawnItem
         }
         break;
     }
-
-    // if its erasing and mouse is pressed
-    if (drawingMode > 3 && mouseIsPressed && doMouseDraw == true)
-    {
-      switch (this.type)
-      {
-        // different collision types for each
-        case "Line":
-          let p1 = adjustForCamera(this.xs[0], this.ys[0]);
-          let p2 = adjustForCamera(this.xs[1], this.ys[1]);
-          let d1 = dist(mouseX, mouseY, p1.x, p1.y);
-          let d2 = dist(mouseX, mouseY, p2.x, p2.y);
-          let d3 = dist(p1.x, p1.y, p2.x, p2.y);
-          if (d1 + d2 < d3 + brushSize.value())
-          {
-            if (drawingMode == 4) drawnItems = del(drawnItems, this.id);
-            if (drawingMode == 5) this.fillColor = brushFillColor.value();
-          }
-          break;
-        case "Rectangle":
-          let p3 = adjustForCamera(this.xs[0], this.ys[0]);
-          let p4 = adjustForCamera(this.xs[1], this.ys[1]);
-          if (collc(mouseX, mouseY, 5, 5, p3.x, p3.y, -tDist(p3.x, p4.x), -tDist(p3.y, p4.y), brushSize.value(), brushSize.value()))
-          {
-            if (drawingMode == 4) drawnItems = del(drawnItems, this.id);
-            if (drawingMode == 5) this.fillColor = brushFillColor.value();
-          }
-          break;
-        case "Circle":
-          let p5 = adjustForCamera(this.xs[0], this.ys[0]);
-          let d4 = dist(mouseX, mouseY, p5.x, p5.y);
-          if (d4 < this.xs[1] + brushSize.value())
-          {
-            if (drawingMode == 4) drawnItems = del(drawnItems, this.id);
-            if (drawingMode == 5) this.fillColor = brushFillColor.value();
-          }
-          break;
-        case "FreeHand":
-          for (let i = 0; i < this.xs.length - 1; i++)
-          {
-            let p6 = adjustForCamera(this.xs[i], this.ys[i]);
-            let p7 = adjustForCamera(this.xs[i + 1], this.ys[i + 1]);
-            let d5 = dist(mouseX, mouseY, p6.x, p6.y);
-            let d6 = dist(mouseX, mouseY, p7.x, p7.y);
-            let d7 = dist(p6.x, p6.y, p7.x, p7.y);
-            if (d5 + d6 < d7 + brushSize.value())
-            {
-              if (drawingMode == 4) drawnItems = del(drawnItems, this.id);
-              if (drawingMode == 5) this.fillColor = brushFillColor.value();
-
-              break;
-            }
-          }
-          break;
+  
+    if(drawingMode >= 4 && mouseIsPressed == true && doMouseDraw == true && this.mouseIsOn() == true){
+      if(drawingMode == 4) {drawnItems = del(
+        drawnItems, this.id); 
+        console.log("Deleted Self: " + this.id);
+        new action("Delete", this);
+      }
+      if(drawingMode == 5 && this.fillColor != brushFillColor.value()) {
+        new action("Recolor", this, this.fillColor);
+        this.fillColor = brushFillColor.value();
       }
     }
+
+  }
+  mouseIsOn()
+  {
+    switch (this.type)
+    {
+      // different collision types for each
+      case "Line":
+        let p1 = adjustForCamera(this.xs[0], this.ys[0]);
+        let p2 = adjustForCamera(this.xs[1], this.ys[1]);
+        let d1 = dist(mouseX, mouseY, p1.x, p1.y);
+        let d2 = dist(mouseX, mouseY, p2.x, p2.y);
+        let d3 = dist(p1.x, p1.y, p2.x, p2.y);
+        if (d1 + d2 < d3 + brushSize.value())
+        {
+          return true;
+        }
+        break;
+      case "Rectangle":
+        let p3 = adjustForCamera(this.xs[0], this.ys[0]);
+        let p4 = adjustForCamera(this.xs[1], this.ys[1]);
+        if (collc(mouseX, mouseY, 5, 5, p3.x, p3.y, -tDist(p3.x, p4.x), -tDist(p3.y, p4.y), brushSize.value(), brushSize.value()))
+        {
+          return true;
+        }
+        break;
+      case "Circle":
+        let p5 = adjustForCamera(this.xs[0], this.ys[0]);
+        let d4 = dist(mouseX, mouseY, p5.x, p5.y);
+        if (d4 < this.xs[1] + brushSize.value())
+        {
+          return true;
+        }
+        break;
+      case "FreeHand":
+        for (let i = 0; i < this.xs.length - 1; i++)
+        {
+          let p6 = adjustForCamera(this.xs[i], this.ys[i]);
+          let p7 = adjustForCamera(this.xs[i + 1], this.ys[i + 1]);
+          let d5 = dist(mouseX, mouseY, p6.x, p6.y);
+          let d6 = dist(mouseX, mouseY, p7.x, p7.y);
+          let d7 = dist(p6.x, p6.y, p7.x, p7.y);
+          fill(255);
+          if(keyIsDown(72)) ellipse(p6.x, p6.y, 10);
+          if (d5 + d6 < d7 + brushSize.value())
+          {
+            return true;
+          }
+        }
+        break;
+    }
+    return false;
+  }
+}
+
+class action {
+  constructor(type, obj, amnt1, amnt2){
+    // Delete, Create, adjustPosition, adjustScale, groupPosition, Recolor
+    this.type = type;
+
+    // object that the action happened to
+    this.obj = obj;
+
+    // used to reverse things like moving objects or scaling objects
+    // also used to store the UI Inputs of an inputed window
+    // amnt1 is also used to store the changed color in recoloring actions
+    this.amnt1 = amnt1;
+    this.amnt2 = amnt2; 
+
+    this.id = actions.length;
+    actions.push(this);
+
+    console.log("Created new Action:\nType: " + this.type + "\nObject Type: " + this.obj.objectType);
+  }
+  reverseSelf(){
+    switch(this.type){
+      case "Delete":
+        if(this.obj.objectType == "Window") {
+          let a = this.obj;
+          a.UIInputs = this.amnt1;
+          a.isCollapsed = this.obj.isCollapsed;
+          let ti = dataToClass(this.obj.titleInp, "UIInput");
+          let c1 = dataToClass(this.obj.closeButton, "UIInput");
+          let c2 = dataToClass(this.obj.collapseButon, "UIInput");
+          let bt = dataToClass(this.obj.bodyText, "UIInput");
+          a.replaceInputs(ti, c1, c2, bt);
+          a.id = drawnWindows.length;
+          drawnWindows.push(a);
+        }
+        if(this.obj.objectType == "Drawn Item"){
+          this.obj.id = drawnItems.length;
+          drawnItems.push(this.obj);
+        }
+        console.log("Undid Delete Of Object Type: " + this.obj.objectType + " With ID: " + this.obj.id);
+        break;
+      case "Create":
+        if(this.obj.objectType == "Window") drawnWindows[drawnWindows.length-1].close(false);
+        if(this.obj.objectType == "Drawn Item") drawnItems.pop();
+        console.log("Undid Creation Of Object Type: " + this.obj.objectType + " With ID: " + this.obj.id);
+        break;
+      case "adjustPosition":
+        if(this.obj.objectType == "Window" || this.obj.objectType == "Input"){
+          this.obj.inWorldX -= this.amnt1;
+          this.obj.inWorldY -= this.amnt2;
+        }
+        if(this.obj.objectType == "Drawn Item"){
+          for(let i = 0; i < this.obj.xs.length; i++){
+            this.obj.xs[i] -= this.amnt1;
+            this.obj.ys[i] -= this.amnt2;
+            if(this.obj.objectType == "Circle") break;
+          }
+        }
+        console.log("Undid Movement Of Object Type: " + this.obj.objectType + " With ID: " + this.obj.id);
+        break;
+      case "adjustScale":
+        // in the case that scaling changes both the x, y, w and h vars, simply add two new actions
+        // one movement change one scale change
+        if(this.obj.objectType == "Window" || this.obj.objectType == "Input"){
+          this.obj.w -= this.amnt1;
+          this.obj.h -= this.amnt2;
+          if(this.obj.objectType == "Window") this.obj.closeButton.inWorldX -= this.amnt1;
+        }
+        console.log("Undid Scaling Of Object Type: " + this.obj.objectType + " With ID: " + this.obj.id);
+        break;
+      case "groupPosition":
+        for(let i = 0; i < this.obj.length; i++){
+          if(this.obj[i].objectType == "Window" || this.obj[i].objectType == "Input"){
+            this.obj[i].inWorldX -= this.amnt1;
+            this.obj[i].inWorldY -= this.amnt2;
+          }
+          if(this.obj[i].objectType == "Drawn Item"){
+            for(let i2 = 0; i2 < this.obj.xs.length; i++){
+              this.obj[i].xs[i2] -= this.amnt1;
+              this.obj[i].ys[i2] -= this.amnt2;
+              if(this.obj[i].objectType == "Circle") break;
+            }
+          }
+          console.log("Undid Movement Of Object Type: " + this.obj[i].objectType + " With ID: " + this.obj[i].id);
+        }
+        console.log("Undid Group Movement");
+        break;
+      case "Recolor":
+        this.obj.fillColor = this.amnt1;
+          console.log("Undid Re-Coloring Of Object Type: Drawn Item With ID: " + this.obj.id);
+          break;
+    }
+    actions.pop();
   }
 }
 
 function keyPressed()
 {
   if (keyIsDown(16) && keyIsDown(17) && keyIsDown(83)) saveSpaceAsFile();
+
+  // copy functionality 17 = ctrl 67 = c
+  if (keyIsDown(17) && keyCode === 67)
+  {
+    let objCopied = false;
+    for (let i = 0; i < drawnWindows.length; i++)
+    {
+      if (drawnWindows[i].mouseIsOn() == true)
+      {
+        copyObject(drawnWindows[i]);
+        objCopied = true;
+        break;
+      }
+    }
+    if (objCopied == false)
+    {
+      for (let i = 0; i < drawnItem.length; i++)
+      {
+        if (drawnItems[i].mouseIsOn() == true)
+        {
+          copyObject(drawnItems[i]);
+          objCopied = true;
+          break;
+        }
+      }
+    }
+
+  }
+
+  // paste functionality 17 = ctrl 86 = v 
+  if (keyIsDown(17) && keyCode === 86)
+  {
+    pasteObject();
+  }
+
+  // undo / ctrl + z functionality
+  if(keyIsDown(17) && keyCode === 90){
+    actions[actions.length-1].reverseSelf();
+  }
 }
 
 function del(a, i2)
