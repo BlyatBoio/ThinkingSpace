@@ -46,6 +46,9 @@ let rightDrawModeButton;
 let leftDrawModeButton;
 let saveFileInput;
 
+// grid Vars
+let gridScale = 50;
+
 // test definitions
 let basicWindow;
 
@@ -62,6 +65,8 @@ function setup()
 
   // test definitions
   basicWindow = new templateWindow(400, 200, [0, 0, 0, 100], 50, 2);
+
+  // define inputs
   titleInput = createInput();
   titleInput.style('background-color: rgba(0, 0, 0, 0)');
   titleInput.style('border-color: white');
@@ -110,8 +115,7 @@ function setup()
 function draw()
 {
   background(20);
-
-  // call camera controls
+  drawGrid();
 
   // mouse trail
   if (doDrawMouseTail == true && doMouseDraw == false) drawMouseTail();
@@ -212,6 +216,7 @@ function draw()
     drawnWindows[i].drawSelf();
   }
 
+  // call camera controls
   cameraControls();
 
   // reset variables
@@ -306,6 +311,27 @@ function cameraControls()
 
 }
 
+function drawGrid(){
+  let gs = gridScale * cameraScale;
+
+  let offX = cameraX%gridScale;
+
+  strokeWeight(2*cameraScale);
+
+  for(let x = 0; x < width/gs + 2; x++){
+    stroke(50);
+    if(x==0) stroke(40);
+    line(x*gs+offX, 0, x*gs+offX, height);
+  }
+
+  let offY = cameraY%gridScale;
+  for(let y = 0; y < height/gs + 2; y++){
+    stroke(50);
+    if(y==0) stroke(50);
+    line(0, y*gs+offY, width, y*gs+offY);
+  }
+}
+
 function mouseWheel(event)
 {
   mouseScrolled = event.delta;
@@ -362,8 +388,17 @@ function doubleClicked()
 
 function openWindow(templateWindow1)
 {
-  drawnWindows.push(new UIwindow(inWorldMouseX, inWorldMouseY, templateWindow1));
-  console.log("Oppened new Window at: (" + inWorldMouseX + ", " + inWorldMouseY + ")" + " ID:" + drawnWindows.length)
+  let a = false
+  for(let i = 0; i < drawnWindows.length; i++){
+    if(drawnWindows[i].mouseIsOn() == true){
+      a = true;
+      break;
+    }
+  }
+  if(a == false){
+    drawnWindows.push(new UIwindow(inWorldMouseX, inWorldMouseY, templateWindow1));
+    console.log("Oppened new Window at: (" + inWorldMouseX + ", " + inWorldMouseY + ")" + " ID:" + drawnWindows.length)
+  }
 }
 
 function saveSpaceAsFile()
@@ -773,7 +808,7 @@ class UIwindow
         this.saveInpy = this.titleInp.inWorldY;
         this.saveInph = this.titleInp.h;
         this.titleInp.inWorldX = this.inWorldX + 30;
-        this.titleInp.inWorldY = this.inWorldY + 20;
+        this.titleInp.inWorldY = this.inWorldY + 22;
         this.titleInp.h = 20;
         for (let i = 0; i < this.UIInputs.length; i++)
         {
@@ -783,8 +818,8 @@ class UIwindow
         this.titleInp.inWorldY -= 18.5;
 
         this.collapseButon.showSelf();
-        this.collapseButon.inWorldX -= 20;
-        this.collapseButon.inWorldY -= 18.5;
+        this.collapseButon.inWorldX -= 28;
+        this.collapseButon.inWorldY -= 28;
         this.isCollapsed = true;
         this.titleInp.doMouseInteraction = false;
       } else
@@ -798,8 +833,8 @@ class UIwindow
         {
           this.UIInputs[i].showSelf();
         }
-        this.collapseButon.inWorldX += 20;
-        this.collapseButon.inWorldY += 18.5;
+        this.collapseButon.inWorldX += 28;
+        this.collapseButon.inWorldY += 28;
         this.isCollapsed = false;
         this.titleInp.doMouseInteraction = true;
       }
@@ -886,6 +921,8 @@ class UIInput
     this.totalMovedY = 0;
     this.totalScaledX = 0;
     this.totalScaledY = 0;
+
+    this.baseSize = this.w + this.h;
   }
   drawSelf()
   {
@@ -1428,11 +1465,12 @@ function collc(x, y, w, h, x2, y2, w2, h2, bx, by)
   }
 
   // draw hitboxes
+  // uncoment for debug purposes
   fill(200, 50, 50, 100);
-  if (keyIsDown(72)) { rect(x, y, w, h); rect(x2, y2, w2, h2) }
+  // if (keyIsDown(72)) { rect(x, y, w, h); rect(x2, y2, w2, h2) }
 
   // actual collision check
-  if (x + w > x2 && x < x2 + w2 && y + h > y2 && y < y2 + h2) return true;
+   if (x + w > x2 && x < x2 + w2 && y + h > y2 && y < y2 + h2) return true;
 
   return false;
 }
